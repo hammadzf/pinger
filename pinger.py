@@ -2,54 +2,60 @@ import sys
 import ipaddress
 from scapy.all import *
 
-#hostname = "google.com"
 
-def main(hostname, limit):
+def main(hostname, count):
 
     # input validation
-    #try:
-    validate_input(hostname, limit)
-    #except:
-    #    raise ValueError('Non-existent or invalid input as first argument')
-
-def validate_input(hostname, limit):
     try:
+        validate_input(hostname, count)
+    except ValueError as e:
+        print(e)
+
+def validate_input(hostname, count):
+    try:
+        count = int(count)
         if hostname.endswith('.com'):
             print("Received a domain name, going to make a DNS query for ", hostname)
             ip_addr = make_query(hostname)
             print('DNS query resulted in: ', ip_addr)
-            send_icmp(ip_addr, limit)
-        else:
+            send_icmp(ip_addr, count)
+        elif ipaddress.ip_address(hostname):
             # in case of an ip address, try to validate the input
-            ip_addr = ipaddress.ip_address(hostname)
             print("Received a valid IP address.")
-            send_icmp(hostname, limit)
-    except:
-        ValueError("Invalid value in the first argument")
+            send_icmp(hostname, count)
+    except ValueError as e:
+        print(e)
 
 
 def make_query(hostname):
     # form request
-    query = IP(dst="8.8.8.8") / UDP(sport=RandShort(), dport=53) / DNS(rd=1, qd=DNSQR(qname=hostname))
+    query = IP(dst="8.8.8.8") / UDP(sport=RandShort(), dport=53) / \
+        DNS(rd=1, qd=DNSQR(qname=hostname))
 
-    # make DNS query
+    # make DNS query and retrieve IP addr from DNS answer
     answer = sr(query, verbose=0)
-    result = answer.an.rdata
+    result = answer[0][DNS][0].answer[DNS][DNSRR].rdata
 
     return result
 
 
-def send_icmp(dst_addr, limit):
+def send_icmp(dst_addr, count):
 
-    print ("Trying to ping", dst_addr)
+    print("Trying to ping", dst_addr)
 
     # form an ICMP packet with dummy payload
     packet = IP(dst=dst_addr, ttl=10) / ICMP() / "XXXXXXXXXXX"
 
-    #send icmp echo and wait for reply
-    reply = srloop(packet, count=int(limit))
+    # send icmp echo and wait for reply
+    reply = srloop(packet, count=int(count))
     return
 
 
+# The script/main function takes two arguments:
+## first argument should be a valid IP address or a FQDN
+## second argument should be an integer.')
+
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    host = sys.argv[1]
+    count = sys.argv[2]
+    main(host, count)
